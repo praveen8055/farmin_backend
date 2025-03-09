@@ -9,7 +9,7 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 //config variables
 const currency = "inr";
 const deliveryCharge = 5;
-const frontend_URL = 'http://localhost:3004';
+const frontend_URL = 'http://localhost:5173/';
 const sendMessage=async(newOrder,OrderType)=>{
     const {email,street,city,zipcode,phone}=newOrder.address;
      const item=newOrder.items;
@@ -64,6 +64,7 @@ const placeOrder = async (req, res) => {
     try {
         const newOrder = new orderModel({
             userId: req.body.userId,
+            productname: req.body.productname,
             items: req.body.items,
             amount: req.body.amount,
             address: req.body.address,
@@ -111,26 +112,60 @@ const placeOrder = async (req, res) => {
 
 // Placing User Order for Frontend using stripe
 const placeOrderCod = async (req, res) => {
-
     try {
-        const newOrder = new orderModel({
-            userId: req.body.userId,
-            items: req.body.items,
-            amount: req.body.amount,
-            address: req.body.address,
-            payment: true,
-        })
-        await newOrder.save();
-        await userModel.findByIdAndUpdate(req.body.userId, { cartData: {} });
-
-        res.json({ success: true, message: "Order Placed" ,sendMessage});
-        const OrderType="COD";
-       sendMessage(newOrder,OrderType);
+      console.log('Received COD order:', req.body);
+      console.log('User ID:', req.user.id);
+  
+      // Validate items array
+      if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Items array is required and must not be empty"
+        });
+      }
+  
+      // Create new order with validated data and paymentMethod
+      const newOrder = new orderModel({
+        userId: req.user.id,
+        productname: req.body.productname,
+        items: req.body.items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity
+        })),
+        amount: req.body.amount,
+        address: req.body.address,
+        status: "Order Placed",
+        payment: false,
+        paymentMethod: 'cod' // Add this line to set payment method
+      });
+  
+      console.log('New order object:', newOrder);
+  
+      await newOrder.save();
+  
+      // Clear cart after successful order
+      await userModel.findByIdAndUpdate(
+        req.user.id,
+        { cartData: {} }
+      );
+  
+      const OrderType = "cod";
+      await sendMessage(newOrder, OrderType);
+  
+      res.json({
+        success: true,
+        message: "Order placed successfully"
+      });
+  
     } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: "Error" })
+      console.error('Order placement error:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to place order",
+        error: error.message
+      });
     }
-}
+};
 
 // Listing Order for Admin panel
 const listOrders = async (req, res) => {
@@ -144,15 +179,47 @@ const listOrders = async (req, res) => {
 }
 
 // User Orders for Frontend
+
 const userOrders = async (req, res) => {
     try {
-        const orders = await orderModel.find({ userId: req.body.userId });
-        res.json({ success: true, data: orders })
+        console.log('Fetching orders for user:', req.user.id);
+
+        if (!req.user?.id) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+
+        const orders = await orderModel.find({ 
+            userId: req.user.id 
+        })
+        .sort({ createdAt: -1 })
+        .lean(); // For better performance
+
+        console.log(`Found ${orders.length} orders`);
+
+        return res.json({
+            success: true,
+            data: orders
+        });
+
     } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: "Error" })
+        console.error('Error in userOrders:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching orders",
+            error: error.message
+        });
     }
-}
+};
+
+
+
+
+
+// Make sure to export the function
+
 
 const updateStatus = async (req, res) => {
     console.log(req.body);
@@ -182,4 +249,19 @@ const verifyOrder = async (req, res) => {
 
 }
 
-export { placeOrder, listOrders, userOrders, updateStatus, verifyOrder, placeOrderCod }
+const hasOrders = async (req, res) => {
+    try {
+      const orders = await orderModel.find({ userId: req.user.id });
+      res.json({ 
+        success: true, 
+        hasOrders: orders.length > 0 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error checking order history' 
+      });
+    }
+  };
+
+export { placeOrder, listOrders, userOrders, updateStatus, verifyOrder, placeOrderCod,hasOrders }

@@ -25,7 +25,12 @@ const loginUser = async (req,res) => {
         }
 
         const token = createToken(user._id)
-        res.json({success:true,token})
+        res.json({
+            success: true,
+            message: "User registered",
+            token:token, // Include token here
+            
+          });
     } catch (error) {
         console.log(error);
         res.json({success:false,message:"Error"})
@@ -58,11 +63,64 @@ const registerUser = async (req,res) => {
         const user = await newUser.save()
         const token = createToken(user._id)
         res.json({success:true,token})
+        console.log("success");
 
     } catch(error){
         console.log(error);
         res.json({success:false,message:"Error"})
     }
 }
+export const saveAddress = async (req, res) => {
+    try {
+        const updatedUser = await userModel.findByIdAndUpdate(
+            req.user.id,
+            { $set: { savedAddress: req.body } },
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Address saved successfully",
+            address: updatedUser.savedAddress
+        });
+    } catch (error) {
+        console.error('Save address error:', error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to save address"
+        });
+    }
+};
+export const getSavedAddress = async (req, res) => {
+    try {
+        const user = await userModel.findById(req.user.id);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            address: user.savedAddress || null
+        });
+    } catch (error) {
+        console.error('Get address error:', error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch saved address"
+        });
+    }
+};
+
 
 export {loginUser, registerUser}
