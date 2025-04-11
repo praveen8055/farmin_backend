@@ -3,6 +3,7 @@ import userModel from "../models/userModel.js"
 import Stripe from "stripe";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 import twilio from 'twilio';
+import { io } from '../server.js';
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -72,6 +73,9 @@ const placeOrder = async (req, res) => {
         await newOrder.save();
         await userModel.findByIdAndUpdate(req.body.userId, { cartData: {} });
 
+        // Emit socket event with new order
+        io.emit('new_order', newOrder);
+
         const line_items = req.body.items.map((item) => ({
             price_data: {
                 currency: currency,
@@ -112,59 +116,48 @@ const placeOrder = async (req, res) => {
 
 // Placing User Order for Frontend using stripe
 const placeOrderCod = async (req, res) => {
-    try {
-      console.log('Received COD order:', req.body);
-      console.log('User ID:', req.user.id);
-  
-      // Validate items array
-      if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Items array is required and must not be empty"
-        });
-      }
-  
-      // Create new order with validated data and paymentMethod
-      const newOrder = new orderModel({
-        userId: req.user.id,
-        productname: req.body.productname,
-        items: req.body.items.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity
-        })),
-        amount: req.body.amount,
-        address: req.body.address,
-        status: "Order Placed",
-        payment: false,
-        paymentMethod: 'cod' // Add this line to set payment method
-      });
-  
-      console.log('New order object:', newOrder);
-  
-      await newOrder.save();
-  
-      // Clear cart after successful order
-      await userModel.findByIdAndUpdate(
-        req.user.id,
-        { cartData: {} }
-      );
-  
-      const OrderType = "cod";
-      await sendMessage(newOrder, OrderType);
-  
-      res.json({
-        success: true,
-        message: "Order placed successfully"
-      });
-  
-    } catch (error) {
-      console.error('Order placement error:', error);
-      res.status(500).json({
+  try {
+    console.log('Received COD order:', req.body);
+
+    if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Failed to place order",
-        error: error.message
+        message: "Items array is required and must not be empty"
       });
     }
+
+    const newOrder = new orderModel({
+      userId: req.user.id,
+      items: req.body.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: parseInt(item.quantity) // Ensure quantity is an integer
+      })),
+      amount: req.body.amount,
+      address: req.body.address,
+      status: "Order Placed",
+      payment: false,
+      paymentMethod: 'cod'
+    });
+
+    await newOrder.save();
+    await userModel.findByIdAndUpdate(req.user.id, { cartData: {} });
+
+    console.log('Emitting new order event:', newOrder._id);
+    io.emit('new_order', newOrder);
+
+    res.json({
+      success: true,
+      message: "Order placed successfully"
+    });
+  } catch (error) {
+    console.error('Order placement error:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to place order",
+      error: error.message
+    });
+  }
 };
 
 // Listing Order for Admin panel
@@ -222,15 +215,38 @@ const userOrders = async (req, res) => {
 
 
 const updateStatus = async (req, res) => {
-    console.log(req.body);
-    try {
-        await orderModel.findByIdAndUpdate(req.body.orderId, { status: req.body.status });
-        res.json({ success: true, message: "Status Updated" })
-    } catch (error) {
-        res.json({ success: false, message: "Error" })
+  try {
+    console.log('Updating order status:', req.body);
+
+    const updatedOrder = await orderModel.findByIdAndUpdate(
+      req.body.orderId, 
+      { status: req.body.status },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
     }
 
-}
+    console.log('Emitting order updated event:', updatedOrder._id);
+    io.emit('order_updated', updatedOrder);
+
+    res.json({ 
+      success: true, 
+      message: "Status Updated",
+      data: updatedOrder
+    });
+  } catch (error) {
+    console.error('Update status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Error updating status"
+    });
+  }
+};
 
 const verifyOrder = async (req, res) => {
     const { orderId, success } = req.body;

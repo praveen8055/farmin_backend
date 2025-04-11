@@ -14,8 +14,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage})
 
+// API Routes
 productRouter.get("/list",listProduct);
 productRouter.post("/add",upload.single('image'),addProduct);
-productRouter.post("/delete",removeProduct);
+productRouter.delete("/remove/:id", removeProduct); // Updated route
 
 export default productRouter;

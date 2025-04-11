@@ -1,56 +1,75 @@
 import productModel from "../models/productModel.js";
-import fs from 'fs'
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// all food list
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const listProduct = async (req, res) => {
     try {
-        const products = await productModel.find({})
-        res.json({ success: true, data: products })
+        const products = await productModel.find({});
+        const productsWithUrls = products.map(product => ({
+            ...product._doc,
+            image: `http://localhost:5010/uploads/${product.image}`
+        }));
+        
+        res.json({ 
+            success: true, 
+            data: productsWithUrls
+        });
     } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: "Error" })
+        console.error('List products error:', error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch products"
+        });
     }
+};
 
-}
-
-// add food
 const addProduct = async (req, res) => {
-
     try {
-        let image_filename = `${req.file.filename}`
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Product image is required"
+            });
+        }
 
         const product = new productModel({
             name: req.body.name,
             description: req.body.description,
             price: req.body.price,
-            category:req.body.category,
-            image: image_filename,
-        })
+            quantity: req.body.quantity,
+            category: req.body.category,
+            image: req.file.filename
+        });
 
         await product.save();
-        res.json({ success: true, message: "Product Added" })
+        
+        res.status(201).json({
+            success: true,
+            message: "Product added successfully",
+            data: {
+                ...product._doc,
+                image: `http://localhost:5010/uploads/${req.file.filename}`
+            }
+        });
     } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: "Error" })
+        console.error('Add product error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to add product"
+        });
     }
-}
+};
 
-// delete food
 const removeProduct = async (req, res) => {
     try {
+        const { id } = req.params;
+        console.log('Deleting product:', id);
 
-        const productId = req.body.id;
-        console.log('Product ID:', productId);
-        if (!productId) {
-            return res.status(400).json({
-                success: false,
-                message: "Product ID is required"
-            });
-        }
-
-        // First check if product exists
-        const product = await productModel.findById(productId);
-        
+        const product = await productModel.findById(id);
         if (!product) {
             return res.status(404).json({
                 success: false,
@@ -60,40 +79,28 @@ const removeProduct = async (req, res) => {
 
         // Delete image file if it exists
         if (product.image) {
-            const imagePath = `uploads/${product.image}`;
-            try {
-                if (fs.existsSync(imagePath)) {
-                    fs.unlinkSync(imagePath);
-                    console.log('Product image deleted:', imagePath);
-                }
-            } catch (error) {
-                console.error('Error deleting image:', error);
+            const imagePath = path.join(__dirname, '..', 'uploads', product.image);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+                console.log('Image deleted:', imagePath);
             }
         }
 
-        // Delete the product
-        const deletedProduct = await productModel.findByIdAndDelete(productId);
+        await productModel.findByIdAndDelete(id);
         
-        if (!deletedProduct) {
-            return res.status(404).json({
-                success: false,
-                message: "Product could not be deleted"
-            });
-        }
-
-        console.log('Product deleted successfully:', productId);
-        res.status(200).json({
+        res.json({
             success: true,
-            message: "Product removed successfully"
+            message: "Product deleted successfully"
         });
 
     } catch (error) {
-        console.error('Remove product error:', error);
+        console.error('Delete product error:', error);
         res.status(500).json({
             success: false,
-            message: error.message || "Error removing product"
+            message: error.message || "Failed to delete product"
         });
     }
 };
 
-export { listProduct, addProduct, removeProduct }
+// Export all functions
+export { listProduct, addProduct, removeProduct };

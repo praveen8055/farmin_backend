@@ -47,6 +47,7 @@ export const createRazorpayOrder = async (req, res) => {
       userId: req.user.id,
       items: items.map(item => ({
         productId: item.productId,
+        productName: item.productName || "Unknown Product",
         quantity: Number(item.quantity)
       })),
       amount,

@@ -8,64 +8,81 @@ import cartRouter from "./routes/cartRoute.js"
 import orderRouter from "./routes/orderRoute.js"
 import adminRouter from "./routes/adminRoutes.js"
 import contactRoutes from './routes/contactRoutes.js';
+import { Server } from 'socket.io';
+import http from 'http';
+
+import path from 'path';
+import { fileURLToPath } from 'url';
 // app config
 const app = express()
 const port = process.env.PORT || 5010;
 
+// Convert Express app to HTTP server
+const server = http.createServer(app);
+
+// Set up Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: ['http://localhost:5174', 'http://localhost:5173'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Socket.IO connection handler with improved logging
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  // Log all events the socket listens to
+  socket.onAny((event, ...args) => {
+    console.log(`Socket ${socket.id} event: ${event}`, args);
+  });
+
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// Export io so it can be used in other files
+export { io };
 
 // middlewares
 app.use(express.json())
 const whitelist = ['http://localhost:5173', 'http://localhost:5174'];
 
-app.use(cors({
+// Consolidated CORS configuration
+const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, postman)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (whitelist.indexOf(origin) !== -1) {
+    if (!origin || whitelist.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS','PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   preflightContinue: false,
   optionsSuccessStatus: 204
-}));
+};
 
-// Add preflight options for all routes
+// Apply CORS once
+app.use(cors(corsOptions));
 
-
-// Add headers middleware
+// Move logging middleware to the top
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (whitelist.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', true);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
-// Handle OPTIONS requests
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (whitelist.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  }
-  res.sendStatus(204);
-});
+
 // db connection
 connectDB()
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // api endpoints
 app.use("/api/user", userRouter)
 app.use("/api/products", productRouter)
@@ -74,7 +91,7 @@ app.use("/images",express.static('uploads'))
 app.use("/api/cart", cartRouter)
 app.use("/api/order",orderRouter)
 app.use('/api/contact', contactRoutes);
-
+app.use("/uploads", express.static(path.join(__dirname, 'uploads')));
 app.get("/", (req, res) => {
     res.send("API Working")
   });
@@ -92,4 +109,7 @@ app.use((req, res) => {
       message: 'Route not found'
   });
 });
-app.listen(port, () => console.log(`Server started on http://localhost:${port}`))
+
+// Use server.listen instead of app.listen
+server.listen(port, () => console.log(`Server started on http://localhost:${port}`));
+
