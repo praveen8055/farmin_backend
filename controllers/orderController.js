@@ -11,53 +11,35 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 const currency = "inr";
 const deliveryCharge = 5;
 const frontend_URL = 'http://localhost:5173/';
-const sendMessage=async(newOrder,OrderType)=>{
-    const {email,street,city,zipcode,phone}=newOrder.address;
-     const item=newOrder.items;
-    //  item.forEach(({  name, price,quantity }) => {
-       
-    //   });
-     
-      const transformedItems = item.map(({  name, price, quantity }) => ({
-        name,
-        price,
-        quantity
-      }));
-    
-      const body = {
-        email: email,
-        street: street,
-        city: city,
-        zipcode: zipcode,
-        phone: phone,
-      };
-      const bodyText = Object.entries(body)
-  .map(([key, value]) => `${key}: ${value}`)
-  .join(', ');
-      
-      // Create a message for each transformed item
-      const itemMessages = transformedItems.map(({ name, price, quantity }) => {
-        return `Order placed: Item - ${name}, Quantity - ${quantity}, Price - ${price}`;
-      });
-      
-      // Join all item messages into a single string
-      const itemsMessage = itemMessages.join('. ');
-      
-      // Combine `body` and `itemsMessage` into the final message
-      const messageBody = bodyText+ '. ' + itemsMessage+"Ordertype:"+OrderType;
-      
-      console.log(messageBody);
-   
 
-    const message = await client.messages.create({
-        body: messageBody,
-        from: '+12317870543',
-        to: process.env.PHONE_NUMBER,
-       
-    })
+// Remove unused variables and commented-out code in sendMessage function
+const sendMessage = async (newOrder, OrderType) => {
+  const { email, street, city, zipcode, phone } = newOrder.address;
+  const transformedItems = newOrder.items.map(({ name, price, quantity }) => ({
+    name,
+    price,
+    quantity
+  }));
 
-    console.log(message)
-}
+  const bodyText = Object.entries({ email, street, city, zipcode, phone })
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(', ');
+
+  const itemsMessage = transformedItems
+    .map(({ name, price, quantity }) => `Order placed: Item - ${name}, Quantity - ${quantity}, Price - ${price}`)
+    .join('. ');
+
+  const messageBody = `${bodyText}. ${itemsMessage} Ordertype: ${OrderType}`;
+  console.log(messageBody);
+
+  const message = await client.messages.create({
+    body: messageBody,
+    from: '+12317870543',
+    to: process.env.PHONE_NUMBER
+  });
+
+  console.log(message);
+};
 
 // Placing User Order for Frontend using stripe
 const placeOrder = async (req, res) => {
