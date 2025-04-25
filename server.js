@@ -35,15 +35,15 @@ io.on('connection', (socket) => {
   
   // Log all events the socket listens to
   socket.onAny((event, ...args) => {
-    console.log(`Socket ${socket.id} event: ${event}`, args);
+    // console.log(`Socket ${socket.id} event: ${event}`, args);
   });
 
   socket.on('error', (error) => {
-    console.error('Socket error:', error);
+    // console.error('Socket error:', error);
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    // console.log('Client disconnected:', socket.id);
   });
 });
 
@@ -75,7 +75,7 @@ app.use(cors(corsOptions));
 
 // Move logging middleware to the top
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  // console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 

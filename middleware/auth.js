@@ -12,10 +12,10 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    console.log('Received token:', token);
+    // console.log('Received token:', token);
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Decoded token:', decoded);
+    // console.log('Decoded token:', decoded);
 
     req.user = decoded;
     next();

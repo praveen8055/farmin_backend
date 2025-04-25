@@ -30,7 +30,7 @@ const sendMessage = async (newOrder, OrderType) => {
     .join('. ');
 
   const messageBody = `${bodyText}. ${itemsMessage} Ordertype: ${OrderType}`;
-  console.log(messageBody);
+  // console.log(messageBody);
 
   const message = await client.messages.create({
     body: messageBody,
@@ -38,7 +38,7 @@ const sendMessage = async (newOrder, OrderType) => {
     to: process.env.PHONE_NUMBER
   });
 
-  console.log(message);
+  // console.log(message);
 };
 
 // Placing User Order for Frontend using stripe
@@ -99,7 +99,7 @@ const placeOrder = async (req, res) => {
 // Placing User Order for Frontend using stripe
 const placeOrderCod = async (req, res) => {
   try {
-    console.log('Received COD order:', req.body);
+    // console.log('Received COD order:', req.body);
 
     if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
       return res.status(400).json({
@@ -125,7 +125,7 @@ const placeOrderCod = async (req, res) => {
     await newOrder.save();
     await userModel.findByIdAndUpdate(req.user.id, { cartData: {} });
 
-    console.log('Emitting new order event:', newOrder._id);
+    // console.log('Emitting new order event:', newOrder._id);
     io.emit('new_order', newOrder);
 
     res.json({
@@ -157,7 +157,7 @@ const listOrders = async (req, res) => {
 
 const userOrders = async (req, res) => {
     try {
-        console.log('Fetching orders for user:', req.user.id);
+        // console.log('Fetching orders for user:', req.user.id);
 
         if (!req.user?.id) {
             return res.status(401).json({
@@ -172,7 +172,7 @@ const userOrders = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(); // For better performance
 
-        console.log(`Found ${orders.length} orders`);
+        // console.log(`Found ${orders.length} orders`);
 
         return res.json({
             success: true,
