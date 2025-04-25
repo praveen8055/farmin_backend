@@ -15,7 +15,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 // app config
 const app = express()
-const port = process.env.PORT || 5010;
+const port = process.env.PORT ;
 
 // Convert Express app to HTTP server
 const server = http.createServer(app);
